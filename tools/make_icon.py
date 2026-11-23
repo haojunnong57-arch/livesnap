@@ -29,7 +29,7 @@ def ring(radius_distance, target, width):
 
 
 def render():
-    pixels = bytearray(SIZE * SIZE * 4)
+    pixels = bytearray(SIZE * SIZE * 3)
     center = SIZE / 2.0
 
     for y in range(SIZE):
@@ -65,30 +65,30 @@ def render():
                 g = g * (1.0 - w) + lg * w
                 b = b * (1.0 - w) + lb * w
 
-            index = (y * SIZE + x) * 4
+            index = (y * SIZE + x) * 3
             pixels[index] = max(0, min(255, int(r)))
             pixels[index + 1] = max(0, min(255, int(g)))
             pixels[index + 2] = max(0, min(255, int(b)))
-            pixels[index + 3] = 255
 
     return pixels
 
 
 def write_png(path, width, height, pixels):
     raw = bytearray()
-    stride = width * 4
+    stride = width * 3
     for y in range(height):
         raw.append(0)
         raw.extend(pixels[y * stride:(y + 1) * stride])
 
     def chunk(tag, payload):
         checksum = zlib.crc32(tag + payload) & 0xFFFFFFFF
-        return tag + struct.pack(">I", len(payload)) + payload + struct.pack(">I", checksum)
+        return (struct.pack(">I", len(payload)) + tag + payload
+                + struct.pack(">I", checksum))
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as handle:
         handle.write(bytes([137, 80, 78, 71, 13, 10, 26, 10]))
-        handle.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)))
+        handle.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)))
         handle.write(chunk(b"IDAT", zlib.compress(bytes(raw), 9)))
         handle.write(chunk(b"IEND", b""))
 
