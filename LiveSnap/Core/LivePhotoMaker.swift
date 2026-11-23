@@ -369,7 +369,7 @@ final class LivePhotoMaker {
             formatDescriptionOut: &formatDescription
         )
 
-        guard status == noErr, let description = formatDescription else {
+        guard status == 0, let description = formatDescription else {
             throw MakerError.pairFailed("实况时间标记的格式创建失败")
         }
 
