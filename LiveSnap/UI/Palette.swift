@@ -6,6 +6,7 @@
 import SwiftUI
 import UIKit
 import AVFoundation
+import AVKit
 import Photos
 import PhotosUI
 
@@ -77,25 +78,29 @@ struct QuietButtonStyle: ButtonStyle {
     }
 }
 
-struct VideoPlayerView: UIViewRepresentable {
+struct VideoSurface: UIViewControllerRepresentable {
     let player: AVPlayer
 
-    func makeUIView(context: Context) -> PlayerLayerView {
-        let view = PlayerLayerView()
-        view.backgroundColor = .black
-        view.playerLayer.videoGravity = .resizeAspect
-        view.playerLayer.player = player
-        return view
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.showsPlaybackControls = false
+        controller.videoGravity = .resizeAspect
+        controller.updatesNowPlayingInfoCenter = false
+        controller.allowsPictureInPicturePlayback = false
+        controller.view.backgroundColor = .black
+        controller.view.isUserInteractionEnabled = false
+        return controller
     }
 
-    func updateUIView(_ uiView: PlayerLayerView, context: Context) {
-        uiView.playerLayer.player = player
+    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
+        if controller.player !== player {
+            controller.player = player
+        }
+        if controller.view.backgroundColor != .black {
+            controller.view.backgroundColor = .black
+        }
     }
-}
-
-final class PlayerLayerView: UIView {
-    override class var layerClass: AnyClass { AVPlayerLayer.self }
-    var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 }
 
 struct LivePhotoPreview: UIViewRepresentable {

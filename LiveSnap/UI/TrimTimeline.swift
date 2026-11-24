@@ -1,6 +1,6 @@
 //
 //  TrimTimeline.swift
-//  视频转实况 - 可拖动的截取时间轴（缩略帧 + 左右把手 + 整体拖动）
+//  视频转实况 - 可拖动的截取时间轴（缩略帧 + 左右把手 + 整体拖动 + 播放指针）
 //
 
 import SwiftUI
@@ -10,6 +10,7 @@ struct TrimTimeline: View {
     let duration: Double
     let start: Double
     let end: Double
+    let playhead: Double
     let thumbnails: [UIImage]
 
     let onBandChanged: (Double) -> Void
@@ -35,11 +36,11 @@ struct TrimTimeline: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 Rectangle()
-                    .fill(Color.black.opacity(0.58))
+                    .fill(Color.black.opacity(0.55))
                     .frame(width: max(0, x0), height: height)
 
                 Rectangle()
-                    .fill(Color.black.opacity(0.58))
+                    .fill(Color.black.opacity(0.55))
                     .frame(width: max(0, width - x1), height: height)
                     .offset(x: x1)
 
@@ -47,6 +48,14 @@ struct TrimTimeline: View {
                     .strokeBorder(Palette.accent, lineWidth: 2)
                     .frame(width: max(0, x1 - x0), height: height)
                     .offset(x: x0)
+
+                if playhead >= start - 0.02, playhead <= end + 0.02 {
+                    Rectangle()
+                        .fill(Palette.accent)
+                        .frame(width: 2, height: height)
+                        .offset(x: min(max(CGFloat(playhead / safeDuration) * width - 1, x0), x1 - 2))
+                        .allowsHitTesting(false)
+                }
 
                 Color.white.opacity(0.001)
                     .frame(width: max(0, x1 - x0 - 28), height: height)
@@ -68,7 +77,7 @@ struct TrimTimeline: View {
     @ViewBuilder
     private func strip(width: CGFloat, height: CGFloat) -> some View {
         if thumbnails.isEmpty {
-            LinearGradient(colors: [Color(white: 0.22), Color(white: 0.35)],
+            LinearGradient(colors: [Color(white: 0.22), Color(white: 0.34)],
                            startPoint: .leading,
                            endPoint: .trailing)
                 .frame(width: width, height: height)

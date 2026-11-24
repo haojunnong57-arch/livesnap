@@ -18,21 +18,25 @@ struct RootView: View {
             Color(uiColor: .systemBackground)
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if model.result != nil {
-                        resultView
-                    } else if model.imported != nil {
-                        trimView
-                    } else {
-                        introView
-                    }
+            if model.result != nil {
+                ScrollView {
+                    resultView
+                        .padding(.horizontal, 20)
+                        .padding(.top, 24)
+                        .padding(.bottom, 40)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 30)
-                .padding(.bottom, 48)
+                .scrollIndicators(.hidden)
+            } else if model.imported != nil {
+                trimView
+            } else {
+                ScrollView {
+                    introView
+                        .padding(.horizontal, 20)
+                        .padding(.top, 30)
+                        .padding(.bottom, 48)
+                }
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
 
             if model.isGenerating {
                 generatingOverlay
@@ -78,7 +82,7 @@ struct RootView: View {
                 .foregroundStyle(Palette.ink)
                 .padding(.top, 10)
 
-            Text("从视频里选一段 0.5–3 秒的画面，生成一张长按会动的实况照片，直接存进「照片」。")
+            Text("选一段画面（默认 3 秒，最长 6 秒），生成一张长按会动的实况照片，直接存进「照片」。")
                 .font(.system(size: 14.5))
                 .foregroundStyle(Palette.subtle)
                 .lineSpacing(5)
@@ -104,7 +108,7 @@ struct RootView: View {
             .disabled(model.isImporting)
             .padding(.top, 18)
 
-            Text("生成前可先在时间轴里循环预览所选片段。")
+            Text("生成前可先循环预览所选片段。")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
                 .padding(.top, 12)
@@ -135,51 +139,78 @@ struct RootView: View {
         .padding(.vertical, 15)
     }
 
-    // MARK: - 截取与预览
+    // MARK: - 截取
 
     private var trimView: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
                 Text("截取片段")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Palette.ink)
-                Spacer()
-                Text("0.5–3 秒")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Palette.subtle)
-            }
 
-            VideoPlayerView(player: model.player)
-                .frame(height: 268)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Spacer()
+
+                Text(String(format: "%.1f 秒", model.length))
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(Palette.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Palette.accent.opacity(0.13)))
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+
+            Spacer(minLength: 14)
+
+            VideoSurface(player: model.player)
+                .aspectRatio(model.videoAspect, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay {
-                    if !model.isPlaying {
-                        ZStack {
-                            Circle()
-                                .fill(Color.black.opacity(0.42))
-                                .frame(width: 58, height: 58)
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 21, weight: .semibold))
-                                .foregroundStyle(.white)
-                        }
+                    if !model.isReady {
+                        ProgressView()
+                            .tint(.white)
+                    } else if !model.isPlaying {
+                        playBadge
                     }
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { model.togglePlay() }
-                .padding(.top, 14)
+                .padding(.horizontal, 20)
+                .animation(.snappy(duration: 0.24), value: model.isPlaying)
+                .animation(.easeInOut(duration: 0.2), value: model.isReady)
 
+            Spacer(minLength: 14)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            controlPanel
+        }
+    }
+
+    private var playBadge: some View {
+        Image(systemName: "play.fill")
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 64, height: 64)
+            .background(Circle().fill(Color.black.opacity(0.42)))
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.14), lineWidth: 1))
+            .transition(.scale(scale: 0.86).combined(with: .opacity))
+    }
+
+    private var controlPanel: some View {
+        VStack(spacing: 14) {
             TrimTimeline(
                 duration: model.duration,
                 start: model.start,
                 end: model.end,
+                playhead: model.playhead,
                 thumbnails: model.thumbnails,
                 onBandChanged: { model.moveWindow(to: $0) },
                 onLeftChanged: { model.resizeLeft(to: $0) },
                 onRightChanged: { model.resizeRight(to: $0) },
                 onScrub: { model.scrub() }
             )
-            .frame(height: 62)
-            .padding(.top, 16)
+            .frame(height: 64)
 
             HStack(spacing: 0) {
                 Text(timeLabel(model.start))
@@ -193,7 +224,18 @@ struct RootView: View {
                     .foregroundStyle(Palette.subtle)
             }
             .font(.system(size: 12, weight: .medium).monospacedDigit())
-            .padding(.top, 10)
+
+            if model.length > 3.05 {
+                HStack(spacing: 5) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                    Text("超过 3 秒时，部分机型只会播放前 3 秒")
+                        .font(.system(size: 11.5))
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(Palette.accent.opacity(0.92))
+                .transition(.opacity)
+            }
 
             Button {
                 model.generate()
@@ -201,8 +243,8 @@ struct RootView: View {
                 Text("生成实况照片")
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(model.isGenerating)
-            .padding(.top, 20)
+            .disabled(model.isGenerating || !model.isReady)
+            .padding(.top, 2)
 
             HStack(spacing: 0) {
                 Button("换一段视频") { showPicker = true }
@@ -210,8 +252,20 @@ struct RootView: View {
                 Button("取消") { model.discardVideo() }
                     .buttonStyle(QuietButtonStyle())
             }
-            .padding(.top, 4)
         }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 6)
+        .background(
+            UnevenRoundedRectangle(topLeadingRadius: 26,
+                                   bottomLeadingRadius: 0,
+                                   bottomTrailingRadius: 0,
+                                   topTrailingRadius: 26,
+                                   style: .continuous)
+                .fill(Palette.surface)
+                .ignoresSafeArea(edges: .bottom)
+        )
+        .animation(.snappy(duration: 0.25), value: model.length > 3.05)
     }
 
     // MARK: - 结果
