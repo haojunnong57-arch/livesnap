@@ -28,7 +28,7 @@ struct MovieFile: Transferable {
             let destination = FileManager.default.temporaryDirectory
                 .appendingPathComponent("video2live-import-" + UUID().uuidString + "." + ext)
             try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.copyItem(at: received.file, to: destination)
+            try? FileManager.default.copyItem(at: received.file, to: destination)
             return MovieFile(url: destination)
         }
     }
@@ -37,11 +37,14 @@ struct MovieFile: Transferable {
 final class MakerViewModel: ObservableObject {
     @Published var imported: ImportedVideo?
     @Published var start: Double = 0
-    @Published var length: Double = LivePhotoMaker.maxLength
+    @Published var length: Double = LivePhotoMaker.defaultLength
     @Published var thumbnails: [UIImage] = []
     @Published var isGenerating = false
     @Published var isImporting = false
     @Published var isPlaying = false
+    @Published var isReady = false
+    @Published var playhead: Double = 0
+    @Published var videoAspect: CGFloat = 16.0 / 9.0
     @Published var progressText = ""
     @Published var result: LivePhotoResult?
     @Published var livePhoto: PHLivePhoto?
@@ -50,8 +53,10 @@ final class MakerViewModel: ObservableObject {
     let player = AVPlayer()
     private let maker = LivePhotoMaker()
     private var workDirectory: URL?
-    private var loopObserver: Any?
+    private var ticker: Any?
     private var endObserver: NSObjectProtocol?
+    private var statusObservation: NSKeyValueObservation?
+    private var pendingSeekSeconds: Double?
 
     var duration: Double { imported?.duration ?? 0 }
     var maxLength: Double { min(LivePhotoMaker.maxLength, max(duration, 0)) }
@@ -60,28 +65,30 @@ final class MakerViewModel: ObservableObject {
 
     init() {
         player.actionAtItemEnd = .pause
-        loopObserver = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.04, preferredTimescale: 600),
+        player.isMuted = true
+        player.automaticallyWaitsToMinimizeStalling = false
+        ticker = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.08, preferredTimescale: 600),
             queue: .main
         ) { [weak self] time in
-            guard let self, self.isPlaying else { return }
+            guard let self else { return }
             let current = CMTimeGetSeconds(time)
             guard current.isFinite else { return }
-            if current >= self.end - 0.02 {
-                self.player.seek(to: CMTime(seconds: self.start, preferredTimescale: 600),
-                                 toleranceBefore: .zero,
-                                 toleranceAfter: .zero)
+            if self.isPlaying {
+                self.playhead = current
+                if current >= self.end - 0.02 {
+                    self.player.seek(to: CMTime(seconds: self.start, preferredTimescale: 600),
+                                     toleranceBefore: .zero,
+                                     toleranceAfter: .zero)
+                }
             }
         }
     }
 
     deinit {
-        if let loopObserver {
-            player.removeTimeObserver(loopObserver)
-        }
-        if let endObserver {
-            NotificationCenter.default.removeObserver(endObserver)
-        }
+        if let ticker { player.removeTimeObserver(ticker) }
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        statusObservation?.invalidate()
     }
 
     // MARK: - 导入
@@ -90,6 +97,7 @@ final class MakerViewModel: ObservableObject {
         isImporting = true
         errorMessage = nil
         pausePreview()
+        isReady = false
         player.replaceCurrentItem(with: nil)
         thumbnails = []
 
@@ -115,23 +123,36 @@ final class MakerViewModel: ObservableObject {
                 seconds = CMTimeGetSeconds(duration)
             }
 
+            var aspect: CGFloat = 16.0 / 9.0
+            if let track = try? await asset.loadTracks(withMediaType: .video).first,
+               let natural = try? await track.load(.naturalSize),
+               let transform = try? await track.load(.preferredTransform) {
+                let rect = CGRect(origin: .zero, size: natural).applying(transform)
+                let width = abs(rect.width)
+                let height = abs(rect.height)
+                if width > 1, height > 1 {
+                    aspect = width / height
+                }
+            }
+
             DispatchQueue.main.async {
                 self.isImporting = false
                 guard seconds.isFinite, seconds > 0.2 else {
                     self.errorMessage = "视频太短了，换一条长一点的。"
                     return
                 }
+
                 self.imported = ImportedVideo(url: loaded.url, duration: seconds)
+                self.videoAspect = aspect == 0 ? 16.0 / 9.0 : aspect
                 self.result = nil
                 self.livePhoto = nil
+                self.playhead = 0
 
                 let maxLen = min(LivePhotoMaker.maxLength, seconds)
-                self.length = maxLen
-                self.start = seconds > maxLen ? (seconds - maxLen) / 2 : 0
+                self.length = min(LivePhotoMaker.defaultLength, maxLen)
+                self.start = seconds > self.length ? (seconds - self.length) / 2 : 0
 
-                self.player.replaceCurrentItem(with: AVPlayerItem(url: loaded.url))
-                self.observeEnd()
-                self.seekToStart()
+                self.preparePlayer(url: loaded.url)
                 self.loadThumbnails(url: loaded.url, duration: seconds)
             }
         }
@@ -161,17 +182,11 @@ final class MakerViewModel: ObservableObject {
     }
 
     func scrub() {
-        seekToStart()
+        seek(to: start)
+        playhead = start
     }
 
-    func seekToStart() {
-        guard imported != nil else { return }
-        player.seek(to: CMTime(seconds: start, preferredTimescale: 600),
-                    toleranceBefore: .zero,
-                    toleranceAfter: .zero)
-    }
-
-    // MARK: - 预览播放
+    // MARK: - 预览
 
     func togglePlay() {
         if isPlaying {
@@ -182,12 +197,10 @@ final class MakerViewModel: ObservableObject {
     }
 
     func playPreview() {
-        guard imported != nil else { return }
+        guard imported != nil, isReady else { return }
         let current = CMTimeGetSeconds(player.currentTime())
         if !current.isFinite || current < start - 0.05 || current >= end - 0.02 {
-            player.seek(to: CMTime(seconds: start, preferredTimescale: 600),
-                        toleranceBefore: .zero,
-                        toleranceAfter: .zero)
+            seek(to: start)
         }
         player.play()
         isPlaying = true
@@ -196,6 +209,7 @@ final class MakerViewModel: ObservableObject {
     func pausePreview() {
         player.pause()
         isPlaying = false
+        playhead = start
     }
 
     // MARK: - 生成
@@ -270,13 +284,49 @@ final class MakerViewModel: ObservableObject {
         result = nil
         livePhoto = nil
         thumbnails = []
+        isReady = false
         start = 0
-        length = LivePhotoMaker.maxLength
+        length = LivePhotoMaker.defaultLength
         player.replaceCurrentItem(with: nil)
         cleanupWork()
     }
 
     // MARK: - 内部
+
+    private func preparePlayer(url: URL) {
+        isReady = false
+        pendingSeekSeconds = nil
+        statusObservation?.invalidate()
+
+        let item = AVPlayerItem(url: url)
+        statusObservation = item.observe(\.status, options: [.new, .initial]) { [weak self] observed, _ in
+            guard let self else { return }
+            let ready = observed.status == .readyToPlay
+            DispatchQueue.main.async {
+                self.isReady = ready
+                guard ready else { return }
+                self.observeEnd()
+                if let target = self.pendingSeekSeconds {
+                    self.pendingSeekSeconds = nil
+                    self.seek(to: target)
+                } else {
+                    self.seek(to: self.start)
+                }
+            }
+        }
+
+        player.replaceCurrentItem(with: item)
+    }
+
+    private func seek(to seconds: Double) {
+        guard isReady else {
+            pendingSeekSeconds = seconds
+            return
+        }
+        let time = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        playhead = max(0, seconds)
+    }
 
     private func observeEnd() {
         if let endObserver {
@@ -302,7 +352,7 @@ final class MakerViewModel: ObservableObject {
             let asset = AVURLAsset(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 260, height: 260)
+            generator.maximumSize = CGSize(width: 280, height: 280)
             generator.requestedTimeToleranceBefore = CMTime(seconds: 0.25, preferredTimescale: 600)
             generator.requestedTimeToleranceAfter = CMTime(seconds: 0.25, preferredTimescale: 600)
 

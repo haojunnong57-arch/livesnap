@@ -2,7 +2,7 @@
 //  LivePhotoMaker.swift
 //  视频转实况
 //
-//  从视频里截一段（0.5–3 秒），生成真正的 iOS 实况照片并存入相册。
+//  从视频里截一段（0.5–6 秒），生成真正的 iOS 实况照片并存入相册。
 //
 
 import Foundation
@@ -50,8 +50,10 @@ enum MakerError: LocalizedError {
 
 final class LivePhotoMaker {
 
-    /// iOS 实况照片的配对视频上限
-    static let maxLength: Double = 3.0
+    /// 可生成的最长片段（系统原生实况约 3 秒，超过部分机型可能只播前 3 秒）
+    static let maxLength: Double = 6.0
+    /// 默认长度
+    static let defaultLength: Double = 3.0
     /// 最短可生成片段
     static let minLength: Double = 0.5
 
