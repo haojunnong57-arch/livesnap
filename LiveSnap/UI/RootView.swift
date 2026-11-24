@@ -1,6 +1,6 @@
 //
 //  RootView.swift
-//  实况工坊 LiveSnap
+//  视频转实况
 //
 
 import SwiftUI
@@ -15,15 +15,14 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            AuroraBackground()
+            AdaptiveBackground()
 
             ScrollView {
-                VStack(spacing: 18) {
-                    header
+                VStack(spacing: 16) {
                     content
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.horizontal, 18)
+                .padding(.top, 26)
                 .padding(.bottom, 40)
             }
             .scrollIndicators(.hidden)
@@ -57,48 +56,6 @@ struct RootView: View {
         )
     }
 
-    // MARK: - 头部
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(LinearGradient(colors: [Palette.violet, Palette.amber.opacity(0.9)],
-                                         startPoint: .topLeading,
-                                         endPoint: .bottomTrailing))
-                    .frame(width: 46, height: 46)
-                Image(systemName: "livephoto")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("实况工坊")
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                Text("视频 → 3 秒实况照片")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
-            }
-
-            Spacer()
-
-            if model.imported != nil {
-                Button {
-                    model.discardVideo()
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.82))
-                        .frame(width: 38, height: 38)
-                        .background(Circle().fill(.ultraThinMaterial))
-                }
-            }
-        }
-    }
-
-    // MARK: - 主体
-
     @ViewBuilder
     private var content: some View {
         if model.result != nil {
@@ -110,35 +67,37 @@ struct RootView: View {
         }
     }
 
+    // MARK: - 首屏
+
     private var introCard: some View {
-        GlassCard {
-            VStack(spacing: 18) {
+        GlassCard(padding: 24) {
+            VStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(LinearGradient(colors: [Palette.violet.opacity(0.7), Palette.amber.opacity(0.55)],
+                        .fill(LinearGradient(colors: [Palette.accent, Palette.accentDeep],
                                              startPoint: .topLeading,
                                              endPoint: .bottomTrailing))
-                        .frame(width: 104, height: 104)
+                        .frame(width: 96, height: 96)
                     Image(systemName: "livephoto.play")
-                        .font(.system(size: 44, weight: .semibold))
+                        .font(.system(size: 42, weight: .semibold))
                         .foregroundStyle(.white)
                 }
-                .padding(.top, 4)
+                .padding(.top, 6)
 
-                Text("选视频，抽 3 秒，一键生成")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                Text("视频转实况")
+                    .font(.system(size: 26, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.primary)
 
-                Text("生成的实况照片会直接存进「照片」App，长按就能看到那 3 秒动态。")
+                Text("导入视频，拖动时间轴选一段 0.5–3 秒，预览满意后生成，直接存进「照片」。")
                     .font(.system(size: 13.5))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(Color.secondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
 
                 HStack(spacing: 8) {
                     stepBadge("1", "选视频")
-                    stepBadge("2", "调起点")
-                    stepBadge("3", "生成入库")
+                    stepBadge("2", "拖区间")
+                    stepBadge("3", "导入相册")
                 }
 
                 Button {
@@ -162,66 +121,76 @@ struct RootView: View {
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(width: 18, height: 18)
-                .background(Circle().fill(Palette.violet.opacity(0.55)))
+                .background(Circle().fill(Palette.accent))
             Text(title)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(Color.primary.opacity(0.72))
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
-        .background(Capsule().fill(Color.white.opacity(0.07)))
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 1))
+        .background(Capsule().fill(Color.primary.opacity(0.06)))
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 1))
     }
 
+    // MARK: - 截取 + 预览
+
     private var trimCard: some View {
-        GlassCard(padding: 16) {
-            VStack(spacing: 16) {
+        GlassCard(padding: 14) {
+            VStack(spacing: 14) {
                 VideoPlayerView(player: model.player)
-                    .frame(height: 330)
-                    .background(Color.black.opacity(0.65))
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .frame(height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
                     )
-
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("截取窗口")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.85))
-                        Spacer()
-                        Text(String(format: "%.1f 秒", model.availableLength))
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Palette.amber)
+                    .overlay(alignment: .bottomLeading) {
+                        Text("长按播放按钮可循环预览所选片段")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.45)))
+                            .padding(10)
                     }
 
-                    if model.maxStart > 0.05 {
-                        Slider(
-                            value: Binding(
-                                get: { model.startTime },
-                                set: { model.setStart($0) }
-                            ),
-                            in: 0...model.maxStart
-                        )
-                        .tint(Palette.amber)
-                    } else {
-                        Text("这段视频不足 3 秒，会整段做成实况照片。")
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 12) {
+                    Button {
+                        model.togglePlay()
+                    } label: {
+                        Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.primary)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(.ultraThinMaterial))
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
                     }
 
-                    HStack {
-                        Text(model.startLabel)
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.6))
-                        Spacer()
-                        Text(model.endLabel)
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
+                    TrimTimeline(
+                        duration: model.duration,
+                        start: model.start,
+                        end: model.end,
+                        thumbnails: model.thumbnails,
+                        onBandChanged: { model.moveWindow(to: $0) },
+                        onLeftChanged: { model.resizeLeft(to: $0) },
+                        onRightChanged: { model.resizeRight(to: $0) },
+                        onScrub: { model.scrub() }
+                    )
+                    .frame(height: 64)
+                    .padding(.vertical, 6)
                 }
+
+                HStack {
+                    Text("起点 " + timeLabel(model.start))
+                    Spacer()
+                    Text("长度 " + String(format: "%.1f 秒", model.length))
+                        .foregroundStyle(Palette.accentDeep)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Text("终点 " + timeLabel(model.end))
+                }
+                .font(.system(size: 11.5, design: .monospaced))
+                .foregroundStyle(Color.secondary)
 
                 Button {
                     model.generate()
@@ -234,48 +203,62 @@ struct RootView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(model.isGenerating)
 
-                Button {
-                    showPicker = true
-                } label: {
-                    Text("换一段视频")
+                HStack(spacing: 10) {
+                    Button {
+                        showPicker = true
+                    } label: {
+                        Text("换一段视频")
+                    }
+                    .buttonStyle(SecondaryCapsuleStyle())
+
+                    Button {
+                        model.discardVideo()
+                    } label: {
+                        Text("取消")
+                    }
+                    .buttonStyle(SecondaryCapsuleStyle())
                 }
-                .buttonStyle(SecondaryCapsuleStyle())
             }
         }
     }
 
+    // MARK: - 结果
+
     private var resultCard: some View {
-        GlassCard(padding: 16) {
+        GlassCard(padding: 14) {
             VStack(spacing: 14) {
                 Group {
                     if let livePhoto = model.livePhoto {
                         LivePhotoPreview(livePhoto: livePhoto)
                     } else {
                         ZStack {
-                            Color.white.opacity(0.06)
+                            Color.black
                             ProgressView().tint(.white)
                         }
                     }
                 }
                 .frame(height: 380)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
                 )
 
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Palette.mint)
+                        .foregroundStyle(Palette.accentDeep)
                     Text("已保存到「照片」相册")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(Color.primary)
                     Spacer()
+                    Text(String(format: "%.1f 秒", model.length))
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Color.secondary)
                 }
 
-                Text("长按上方画面即可预览动态；到「照片」里打开这张图，长按同样会动。")
+                Text("长按上方画面可预览动态；到「照片」里打开这张图，长按同样会动。")
                     .font(.system(size: 12.5))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(Color.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .lineSpacing(2)
 
@@ -300,29 +283,29 @@ struct RootView: View {
 
     private var generatingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.55).ignoresSafeArea()
+            Color.black.opacity(0.35).ignoresSafeArea()
 
             VStack(spacing: 14) {
                 ProgressView()
-                    .tint(.white)
+                    .tint(Color.primary)
                     .scaleEffect(1.15)
 
                 Text("正在生成实况照片")
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.primary)
 
                 Text(model.progressText)
                     .font(.system(size: 12.5))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(Color.secondary)
             }
             .padding(28)
             .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.regularMaterial)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
             )
         }
     }

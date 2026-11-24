@@ -1,6 +1,6 @@
 //
 //  Palette.swift
-//  实况工坊 LiveSnap - 配色、卡片、按钮与原生视图桥接
+//  视频转实况 - 自适应配色、卡片、按钮与原生视图桥接
 //
 
 import SwiftUI
@@ -10,11 +10,8 @@ import Photos
 import PhotosUI
 
 enum Palette {
-    static let ink = Color(red: 0.035, green: 0.047, blue: 0.082)
-    static let inkSoft = Color(red: 0.086, green: 0.070, blue: 0.145)
-    static let amber = Color(red: 1.000, green: 0.780, blue: 0.435)
-    static let violet = Color(red: 0.560, green: 0.435, blue: 0.980)
-    static let mint = Color(red: 0.420, green: 0.930, blue: 0.780)
+    static let accent = Color(red: 0.976, green: 0.608, blue: 0.196)
+    static let accentDeep = Color(red: 0.937, green: 0.451, blue: 0.071)
 }
 
 func timeLabel(_ seconds: Double) -> String {
@@ -24,25 +21,38 @@ func timeLabel(_ seconds: Double) -> String {
     return String(format: "%02d:%04.1f", minutes, rest)
 }
 
-struct AuroraBackground: View {
+struct AdaptiveBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Palette.ink, Palette.inkSoft, Palette.ink],
-                           startPoint: .topLeading,
-                           endPoint: .bottomTrailing)
-            Circle()
-                .fill(Palette.violet.opacity(0.34))
-                .frame(width: 430, height: 430)
-                .blur(radius: 110)
-                .offset(x: -130, y: -290)
-            Circle()
-                .fill(Palette.amber.opacity(0.18))
-                .frame(width: 360, height: 360)
-                .blur(radius: 120)
-                .offset(x: 170, y: 310)
+            if colorScheme == .dark {
+                Color.black
+                Circle()
+                    .fill(Color(red: 0.55, green: 0.42, blue: 0.98).opacity(0.13))
+                    .frame(width: 460, height: 460)
+                    .blur(radius: 130)
+                    .offset(x: -130, y: -300)
+                Circle()
+                    .fill(Palette.accent.opacity(0.09))
+                    .frame(width: 380, height: 380)
+                    .blur(radius: 140)
+                    .offset(x: 170, y: 320)
+            } else {
+                Color(uiColor: .systemBackground)
+                Circle()
+                    .fill(Palette.accent.opacity(0.14))
+                    .frame(width: 420, height: 420)
+                    .blur(radius: 120)
+                    .offset(x: -150, y: -280)
+                Circle()
+                    .fill(Color(red: 0.52, green: 0.60, blue: 1.0).opacity(0.12))
+                    .frame(width: 380, height: 380)
+                    .blur(radius: 130)
+                    .offset(x: 170, y: 300)
+            }
         }
         .ignoresSafeArea()
-        .background(Palette.ink)
     }
 }
 
@@ -50,7 +60,7 @@ struct GlassCard<Content: View>: View {
     private let padding: CGFloat
     private let content: Content
 
-    init(padding: CGFloat = 22, @ViewBuilder content: () -> Content) {
+    init(padding: CGFloat = 20, @ViewBuilder content: () -> Content) {
         self.padding = padding
         self.content = content()
     }
@@ -60,19 +70,14 @@ struct GlassCard<Content: View>: View {
             .padding(padding)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .fill(.ultraThinMaterial)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(colors: [Color.white.opacity(0.34), Color.white.opacity(0.04)],
-                                       startPoint: .topLeading,
-                                       endPoint: .bottomTrailing),
-                        lineWidth: 1
-                    )
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.38), radius: 26, x: 0, y: 18)
+            .shadow(color: Color.black.opacity(0.16), radius: 22, x: 0, y: 12)
     }
 }
 
@@ -80,18 +85,11 @@ struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 16.5, weight: .bold, design: .rounded))
-            .foregroundStyle(Color(red: 0.06, green: 0.05, blue: 0.09))
+            .foregroundStyle(Color(uiColor: .systemBackground))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(
-                Capsule().fill(
-                    LinearGradient(colors: [Palette.amber, Palette.mint],
-                                   startPoint: .leading,
-                                   endPoint: .trailing)
-                )
-            )
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
-            .shadow(color: Palette.amber.opacity(0.22), radius: 16, x: 0, y: 10)
+            .background(Capsule().fill(Color.primary))
+            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.18), lineWidth: 1))
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.82), value: configuration.isPressed)
     }
@@ -101,11 +99,11 @@ struct SecondaryCapsuleStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 14, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.white.opacity(0.86))
+            .foregroundStyle(Color.primary.opacity(0.86))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.16 : 0.07)))
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
+            .background(Capsule().fill(Color.primary.opacity(configuration.isPressed ? 0.14 : 0.06)))
+            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
     }
 }
 
@@ -114,7 +112,7 @@ struct VideoPlayerView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PlayerLayerView {
         let view = PlayerLayerView()
-        view.backgroundColor = .clear
+        view.backgroundColor = .black
         view.playerLayer.videoGravity = .resizeAspect
         view.playerLayer.player = player
         return view
@@ -138,7 +136,7 @@ struct LivePhotoPreview: UIViewRepresentable {
         view.livePhoto = livePhoto
         view.contentMode = .scaleAspectFit
         view.clipsToBounds = true
-        view.backgroundColor = .clear
+        view.backgroundColor = .black
         return view
     }
 

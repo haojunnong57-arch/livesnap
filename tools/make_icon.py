@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates LiveSnap's 1024pt app icon using only the standard library."""
+"""Generates the 1024pt app icon: Apple's native Live Photo glyph on black."""
 
 import math
 import os
@@ -23,8 +23,8 @@ def smoothstep(edge0, edge1, value):
 def ring(radius_distance, target, width):
     inner = target - width / 2.0
     outer = target + width / 2.0
-    return smoothstep(inner - 1.2, inner + 1.2, radius_distance) * (
-        1.0 - smoothstep(outer - 1.2, outer + 1.2, radius_distance)
+    return smoothstep(inner - 1.1, inner + 1.1, radius_distance) * (
+        1.0 - smoothstep(outer - 1.1, outer + 1.1, radius_distance)
     )
 
 
@@ -36,34 +36,26 @@ def render():
         fy = y / SIZE
         for x in range(SIZE):
             fx = x / SIZE
-
-            violet_glow = math.exp(-(((fx - 0.22) ** 2 + (fy - 0.14) ** 2) / 0.14))
-            amber_glow = math.exp(-(((fx - 0.86) ** 2 + (fy - 0.92) ** 2) / 0.20))
-            vignette = 1.0 - 0.5 * smoothstep(0.30, 1.30, math.hypot(fx - 0.5, fy - 0.45))
-
-            r = 9.0 * vignette + 96.0 * violet_glow + 30.0 * amber_glow
-            g = 13.0 * vignette + 48.0 * violet_glow + 20.0 * amber_glow
-            b = 28.0 * vignette + 158.0 * violet_glow + 10.0 * amber_glow
-
             dx = x - center
             dy = y - center
             distance = math.hypot(dx, dy)
 
-            alpha = max(
-                0.92 * ring(distance, 300.0, 26.0),
-                0.68 * ring(distance, 206.0, 15.0),
-                1.0 - smoothstep(86.0, 92.0, distance),
-            )
+            # 中心极淡的白光，让图形有原生徽标的浮起感
+            halo = math.exp(-((distance / 360.0) ** 2)) * 0.05
 
-            if alpha > 0.0:
-                tint = smoothstep(0.20, 0.95, fy)
-                lr = 255.0 - 24.0 * tint
-                lg = 246.0 - 44.0 * tint
-                lb = 234.0 - 98.0 * tint
-                w = min(1.0, alpha)
-                r = r * (1.0 - w) + lr * w
-                g = g * (1.0 - w) + lg * w
-                b = b * (1.0 - w) + lb * w
+            # Apple 原生实况图标：外环 + 中环 + 实心圆点
+            alpha = max(
+                ring(distance, 300.0, 30.0),
+                ring(distance, 206.0, 26.0),
+                1.0 - smoothstep(78.0, 82.0, distance),
+            )
+            alpha = min(1.0, max(alpha, halo))
+
+            # 纯黑背景 + 白灰徽标
+            glyph = 246.0 - 26.0 * smoothstep(0.15, 0.95, fy)
+            r = glyph * alpha
+            g = glyph * alpha
+            b = (glyph + 4.0) * alpha
 
             index = (y * SIZE + x) * 3
             pixels[index] = max(0, min(255, int(r)))

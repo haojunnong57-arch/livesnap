@@ -1,8 +1,8 @@
 //
 //  LivePhotoMaker.swift
-//  实况工坊 LiveSnap
+//  视频转实况
 //
-//  视频 → 3 秒实况照片：剪片段、取封面帧、原样重封装并写入配对元数据、存进相册。
+//  从视频里截一段（0.5–3 秒），生成真正的 iOS 实况照片并存入相册。
 //
 
 import Foundation
@@ -33,13 +33,13 @@ enum MakerError: LocalizedError {
         case .unreadableVideo:
             return "这段视频读不出来，换一条试试。"
         case .trimFailed(let reason):
-            return "截取 3 秒片段失败：" + reason
+            return "截取片段失败：" + reason
         case .stillFailed:
             return "封面帧提取失败。"
         case .pairFailed(let reason):
             return "写入实况照片信息失败：" + reason
         case .permissionDenied:
-            return "没有相册写入权限，请到「设置 › 实况工坊」里打开「添加照片」。"
+            return "没有相册写入权限，请到「设置 › 视频转实况」里打开「添加照片」。"
         case .saveFailed(let reason):
             return "保存到相册失败：" + reason
         case .previewFailed:
@@ -50,12 +50,16 @@ enum MakerError: LocalizedError {
 
 final class LivePhotoMaker {
 
-    static let clipLength: Double = 3.0
+    /// iOS 实况照片的配对视频上限
+    static let maxLength: Double = 3.0
+    /// 最短可生成片段
+    static let minLength: Double = 0.5
 
     // MARK: - 主流程
 
     func generate(sourceURL: URL,
                   startSeconds: Double,
+                  lengthSeconds: Double,
                   workDirectory: URL,
                   progress: @escaping (String) -> Void) async throws -> LivePhotoResult {
         let asset = AVURLAsset(url: sourceURL)
@@ -68,7 +72,7 @@ final class LivePhotoMaker {
         let total = CMTimeGetSeconds(durationTime)
         guard total.isFinite, total > 0.1 else { throw MakerError.unreadableVideo }
 
-        let length = min(Self.clipLength, total)
+        let length = max(Self.minLength, min(lengthSeconds, min(Self.maxLength, total)))
         let start = max(0, min(startSeconds, total - length))
         let range = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600),
                                 duration: CMTime(seconds: length, preferredTimescale: 600))
@@ -76,7 +80,7 @@ final class LivePhotoMaker {
         try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
         let identifier = UUID().uuidString
 
-        progress("正在截取 3 秒片段…")
+        progress("正在截取片段…")
         let clipURL = workDirectory.appendingPathComponent("clip-" + identifier + ".mov")
         try exportClip(asset: asset, range: range, to: clipURL)
 
