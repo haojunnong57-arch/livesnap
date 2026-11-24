@@ -1,6 +1,6 @@
 //
 //  LiveSnapApp.swift
-//  实况工坊 LiveSnap
+//  视频转实况
 //
 
 import SwiftUI
@@ -10,8 +10,6 @@ struct LiveSnapApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .preferredColorScheme(.dark)
-                .tint(Palette.amber)
         }
     }
 }
